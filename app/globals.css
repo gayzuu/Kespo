@@ -391,10 +391,12 @@ h2,
 
 .deck {
   --size: clamp(220px, 30vw, 320px);
+  /* Distance de sortie du vinyle pendant la lecture (fraction de la pochette) */
+  --out: 0.46;
   position: relative;
   width: var(--size);
   height: var(--size);
-  margin-right: calc(var(--size) * 0.28);
+  margin-right: calc(var(--size) * var(--out));
 }
 
 .cover {
@@ -447,7 +449,7 @@ h2,
     conic-gradient(from 30deg, transparent 0 10%, rgba(255, 255, 255, 0.07) 14%, transparent 20% 60%, rgba(255, 255, 255, 0.05) 64%, transparent 70%),
     repeating-radial-gradient(circle, #111116 0 2px, #25252c 2px 3px);
   box-shadow: 0 0 0 1px #34343c, 0 20px 40px rgba(0, 0, 0, 0.6);
-  transform: translateX(14%);
+  transform: translateX(calc(var(--size) * 0.12));
   transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
@@ -469,7 +471,7 @@ h2,
 }
 
 .is-playing .vinyl {
-  transform: translateX(30%);
+  transform: translateX(calc(var(--size) * var(--out)));
 }
 
 .is-playing .vinyl-label {
@@ -952,7 +954,8 @@ h2,
 
   .deck {
     /* 220 px minimum : YouTube exige un lecteur d'au moins 200 × 200 px. */
-    --size: clamp(220px, 62vw, 260px);
+    --size: clamp(220px, 56vw, 250px);
+    --out: 0.38;
   }
 
   .track-row {
