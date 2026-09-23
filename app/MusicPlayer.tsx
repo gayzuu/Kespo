@@ -46,7 +46,7 @@ declare global {
 
 type Tab = "sets" | "productions";
 
-const TAB_LABELS: Record<Tab, string> = { sets: "Sets", productions: "Morceaux" };
+const TAB_LABELS: Record<Tab, string> = { sets: "Sets", productions: "Productions" };
 
 const WIDGET_PARAMS = {
   hide_related: true,

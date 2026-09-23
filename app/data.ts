@@ -43,8 +43,7 @@ export const sets: Track[] = [
     artwork: `${blob}/gon6.jpg`,
   },
   {
-    title: "Summer Vibes",
-    place: "Mix contest",
+    title: "Summer Vibes Warm-up",
     date: "Juin 2025",
     duration: 1724,
     youtube: "tFL757t-o4Y",
@@ -84,7 +83,7 @@ export const sets: Track[] = [
   },
 ];
 
-// Morceaux : fichiers MP3 hébergés sur Vercel Blob (`npm run upload -- fichier.mp3` donne l'URL).
+// Productions : fichiers audio hébergés sur Vercel Blob (`npm run upload -- fichier.mp3` donne l'URL).
 // Exemple :
 // {
 //   title: "Nom du morceau",
@@ -102,7 +101,7 @@ export const productions: Track[] = [
   },
 ];
 
-export const mainGenres = ["House", "Tech House", "Minimal"];
+export const mainGenres = ["Tech House", "House", "Minimal"];
 export const otherGenres = ["Disco House", "House Jazz", "Acid", "Deep House", "Lounge"];
 
 export const influences = [
