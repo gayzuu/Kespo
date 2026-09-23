@@ -5,27 +5,9 @@ import Script from "next/script";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Track } from "./data";
 
-// Trois sources de lecture derrière la même interface :
-// - SoundCloud : iframe cachée pilotée par l'API Widget officielle ;
-// - YouTube : lecteur IFrame API, affiché à la place de la pochette pendant la lecture
-//   (YouTube interdit de masquer la vidéo, minimum 200×200 px) ;
-// - fichiers audio (Vercel Blob) : élément <audio> natif.
-type YTPlayer = {
-  loadVideoById(id: string): void;
-  playVideo(): void;
-  pauseVideo(): void;
-  seekTo(seconds: number, allowSeekAhead: boolean): void;
-  getCurrentTime(): number;
-  getDuration(): number;
-  getPlayerState(): number;
-  destroy(): void;
-};
-
-const YT_PLAYING = 1;
-const YT_PAUSED = 2;
-const YT_ENDED = 0;
-const YT_BUFFERING = 3;
-
+// Deux sources de lecture derrière la même interface :
+// - sets SoundCloud : iframe cachée pilotée par l'API Widget officielle ;
+// - morceaux MP3 (Vercel Blob) : élément <audio> natif.
 type SCWidget = {
   bind(event: string, cb: (e: { currentPosition?: number }) => void): void;
   unbind(event: string): void;
@@ -39,8 +21,6 @@ type SCWidget = {
 declare global {
   interface Window {
     SC?: { Widget: (el: HTMLIFrameElement) => SCWidget };
-    YT?: { Player: new (el: HTMLElement, options: Record<string, unknown>) => YTPlayer };
-    onYouTubeIframeAPIReady?: () => void;
   }
 }
 
@@ -98,22 +78,17 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
   const tabs = (["sets", "productions"] as Tab[]).filter((t) => (t === "sets" ? sets : productions).length > 0);
   const kindOf = useCallback((i: number): Tab => (i < sets.length ? "sets" : "productions"), [sets.length]);
   const firstSC = all.findIndex((t) => t.soundcloud);
-  const firstYT = all.findIndex((t) => t.youtube);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const widgetRef = useRef<SCWidget | null>(null);
-  const ytHostRef = useRef<HTMLDivElement>(null);
-  const ytRef = useRef<YTPlayer | null>(null);
-  // Index du morceau chargé dans sa source (au départ : le 1er s'il est SoundCloud ou YouTube, préchargé).
-  const loadedRef = useRef(firstSC === 0 || firstYT === 0 ? 0 : -1);
+  const loadedRef = useRef(firstSC === 0 ? 0 : -1);
   const playingRef = useRef(false);
   const currentRef = useRef(0);
   const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
   const [scReady, setScReady] = useState(false);
-  const [ytReady, setYtReady] = useState(false);
   const [current, setCurrent] = useState(0);
   const [tab, setTab] = useState<Tab>(tabs[0] ?? "sets");
   const [playing, setPlaying] = useState(false);
@@ -129,13 +104,7 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
   const durationOf = (i: number) => all[i]?.duration ?? durations[i] ?? 0;
   const duration = durationOf(current);
   const progress = duration ? Math.min(1, position / (duration * 1000)) : 0;
-  const canPlay = (i: number) => {
-    const t = all[i];
-    if (!t) return false;
-    return t.audio ? true : t.youtube ? ytReady : scReady;
-  };
-  // La vidéo YouTube n'apparaît qu'une fois lancée (ou si le navigateur exige un tap dessus).
-  const showVideo = Boolean(track?.youtube) && (playing || loading || position > 0 || needsTap);
+  const canPlay = (i: number) => Boolean(all[i]?.audio) || scReady;
 
   const playRef = useRef<(i: number) => void>(() => {});
 
@@ -164,7 +133,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
   // (évite qu'un "pause" SoundCloud tardif écrase la lecture d'un MP3, et inversement).
   const scActive = useCallback(() => Boolean(all[loadedRef.current]?.soundcloud), [all]);
   const audioActive = () => Boolean(all[loadedRef.current]?.audio);
-  const ytActive = useCallback(() => Boolean(all[loadedRef.current]?.youtube), [all]);
 
   const bindEvents = useCallback(
     (w: SCWidget) => {
@@ -202,19 +170,12 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
     const t = all[i];
     const w = widgetRef.current;
     const audio = audioRef.current;
-    const yt = ytRef.current;
-    if (!t || !audio || (t.soundcloud && !w) || (t.youtube && !yt)) return;
+    if (!t || !audio || (t.soundcloud && !w)) return;
 
     if (i === loadedRef.current) {
       if (t.audio) {
         if (audio.paused) audio.play().catch(onStopped);
         else audio.pause();
-      } else if (t.youtube) {
-        if (yt!.getPlayerState() === YT_PLAYING) yt!.pauseVideo();
-        else {
-          armFallback();
-          yt!.playVideo();
-        }
       } else {
         if (!playingRef.current) armFallback();
         w!.toggle();
@@ -225,7 +186,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
     const prev = all[loadedRef.current];
     if (prev?.audio) audio.pause();
     if (prev?.soundcloud) w?.pause();
-    if (prev?.youtube) yt?.pauseVideo();
     if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
     setNeedsTap(false);
 
@@ -242,9 +202,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
         onStopped();
         setLoading(false);
       });
-    } else if (t.youtube) {
-      yt!.loadVideoById(t.youtube);
-      armFallback();
     } else if (t.soundcloud) {
       w!.load(t.soundcloud, {
         ...WIDGET_PARAMS,
@@ -264,7 +221,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
     const ms = Math.max(0, Math.min(1, fraction)) * duration * 1000;
     setPosition(ms);
     if (track.audio && audioRef.current) audioRef.current.currentTime = ms / 1000;
-    else if (track.youtube) ytRef.current?.seekTo(ms / 1000, true);
     else widgetRef.current?.seekTo(ms);
   };
 
@@ -275,71 +231,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
       if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
     };
   }, [initWidget]);
-
-  // Lecteur YouTube : créé une fois l'API chargée, avec le 1er set YouTube en attente.
-  useEffect(() => {
-    if (firstYT < 0 || !ytHostRef.current) return;
-    // YouTube remplace l'élément reçu par son iframe : on lui donne un enfant hors de React.
-    const el = document.createElement("div");
-    ytHostRef.current.appendChild(el);
-    let cancelled = false;
-
-    const create = () => {
-      if (cancelled || !window.YT?.Player) return;
-      ytRef.current = new window.YT.Player(el, {
-        videoId: all[firstYT].youtube,
-        width: "100%",
-        height: "100%",
-        host: "https://www.youtube-nocookie.com",
-        playerVars: { playsinline: 1, rel: 0 },
-        events: {
-          onReady: () => setYtReady(true),
-          onStateChange: (e: { data: number }) => {
-            if (!ytActive()) return;
-            if (e.data === YT_PLAYING) {
-              onStarted();
-              const d = ytRef.current?.getDuration();
-              if (d) setDurations((prev) => ({ ...prev, [loadedRef.current]: d }));
-            } else if (e.data === YT_PAUSED) onStopped();
-            else if (e.data === YT_ENDED) onFinished();
-            else if (e.data === YT_BUFFERING) setLoading(true);
-          },
-        },
-      });
-    };
-
-    if (window.YT?.Player) create();
-    else {
-      const previous = window.onYouTubeIframeAPIReady;
-      window.onYouTubeIframeAPIReady = () => {
-        previous?.();
-        create();
-      };
-      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-        const script = document.createElement("script");
-        script.src = "https://www.youtube.com/iframe_api";
-        document.body.appendChild(script);
-      }
-    }
-
-    return () => {
-      cancelled = true;
-      ytRef.current?.destroy();
-      ytRef.current = null;
-      el.remove();
-    };
-    // Créé une seule fois : les callbacks lisent l'état via des refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // YouTube n'émet pas d'événement de progression : on lit la position pendant la lecture.
-  useEffect(() => {
-    if (!playing || !track?.youtube) return;
-    const id = setInterval(() => {
-      if (ytActive() && ytRef.current) setPosition(ytRef.current.getCurrentTime() * 1000);
-    }, 500);
-    return () => clearInterval(id);
-  }, [playing, track?.youtube, ytActive]);
 
   useEffect(() => {
     const el = playerRef.current;
@@ -389,7 +280,6 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
               </div>
               <div className="cover">
                 <Image src={track.artwork} alt={`Pochette — ${track.title}`} fill sizes="(max-width: 640px) 70vw, 340px" />
-                {firstYT >= 0 && <div ref={ytHostRef} className={`yt-video ${showVideo ? "visible" : ""}`} />}
               </div>
             </div>
 
@@ -449,11 +339,9 @@ export default function MusicPlayer({ sets, productions }: { sets: Track[]; prod
                 <span>{duration ? formatTime(duration) : "--:--"}</span>
               </div>
 
-              {needsTap && track.youtube && <p className="tap-hint">Touche la vidéo pour lancer la lecture.</p>}
-
               {firstSC >= 0 && (
-                <div className={`sc-embed ${needsTap && track.soundcloud ? "visible" : ""}`}>
-                  {needsTap && track.soundcloud && <p>Ton navigateur bloque la lecture automatique : lance le son depuis le lecteur ci-dessous.</p>}
+                <div className={`sc-embed ${needsTap ? "visible" : ""}`}>
+                  {needsTap && <p>Ton navigateur bloque la lecture automatique : lance le son depuis le lecteur ci-dessous.</p>}
                   <iframe
                     ref={iframeRef}
                     src={widgetSrc(all[firstSC].soundcloud!)}

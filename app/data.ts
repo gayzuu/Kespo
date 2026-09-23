@@ -23,31 +23,22 @@ export type Track = {
   /** Pochette carrée */
   artwork: string;
 } & (
-  | { /** Lien public SoundCloud */ soundcloud: string; audio?: never; youtube?: never }
-  | { /** URL du fichier audio (Vercel Blob) */ audio: string; soundcloud?: never; youtube?: never }
-  | { /** Identifiant de la vidéo YouTube (youtu.be/IDENTIFIANT) */ youtube: string; soundcloud?: never; audio?: never }
+  | { /** Lien public SoundCloud */ soundcloud: string; audio?: never }
+  | { /** URL du fichier audio (Vercel Blob) */ audio: string; soundcloud?: never }
 );
 
-// Sets : hébergés sur SoundCloud ou YouTube (le plus récent en premier).
+// Sets : hébergés sur Vercel Blob (`audio`) ou SoundCloud (`soundcloud`), dans l'ordre d'affichage.
 // Pochette SoundCloud : remplacer "-large" par "-t500x500" dans l'URL.
-// Pour YouTube, la vidéo remplace la pochette pendant la lecture (obligatoire chez YouTube).
 const blob = "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music";
 
 export const sets: Track[] = [
   {
-    title: "Tech House",
+    title: "Afro Tech",
     place: "Glass, Cannes",
-    date: "Février 2026",
-    duration: 3668,
-    youtube: "Oq6vAi0Cpbg",
+    date: "2025",
+    duration: 5547,
+    audio: `${blob}/kespo-afro-tech-glass.m4a`,
     artwork: `${blob}/gon6.jpg`,
-  },
-  {
-    title: "Summer Vibes Warm-up",
-    date: "Juin 2025",
-    duration: 1724,
-    youtube: "tFL757t-o4Y",
-    artwork: `${blob}/kespo-summer-vibes.jpg`,
   },
   {
     title: "Sunny House",
@@ -56,14 +47,6 @@ export const sets: Track[] = [
     duration: 2124,
     soundcloud: "https://soundcloud.com/xkespo/label-france-contest",
     artwork: "https://i1.sndcdn.com/artworks-WVO2HuBwGwcbUsck-YygplQ-t500x500.jpg",
-  },
-  {
-    title: "Lounge Jazz",
-    place: "Yachting Festival, Cannes",
-    date: "Octobre 2023",
-    duration: 3794,
-    youtube: "eWT5uEUs-38",
-    artwork: `${blob}/kespo-lounge-jazz.jpg`,
   },
   {
     title: "Live Set — House",

@@ -412,34 +412,6 @@ h2,
   object-fit: cover;
 }
 
-.yt-video {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: #000;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.4s;
-}
-
-.yt-video.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.yt-video iframe {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border: 0;
-}
-
-.tap-hint {
-  margin: 16px 0 0;
-  font-size: 14px;
-  color: var(--accent);
-}
-
 .vinyl {
   position: absolute;
   inset: 4%;
@@ -953,7 +925,6 @@ h2,
   }
 
   .deck {
-    /* 220 px minimum : YouTube exige un lecteur d'au moins 200 × 200 px. */
     --size: clamp(220px, 56vw, 250px);
     --out: 0.38;
   }

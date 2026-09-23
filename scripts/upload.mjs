@@ -37,11 +37,14 @@ const slug = (name) =>
 for (const file of files) {
   const ext = extname(file);
   const name = `music/${slug(basename(file, ext))}${ext.toLowerCase()}`;
-  const blob = await put(name, await readFile(file), {
+  const data = await readFile(file);
+  const blob = await put(name, data, {
     access: "public",
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: TYPES[ext.toLowerCase()],
+    // Envoi en plusieurs parties pour les gros fichiers (sets longs)
+    multipart: data.length > 50 * 1024 * 1024,
   });
   console.log(`${basename(file)} → ${blob.url}`);
 }
