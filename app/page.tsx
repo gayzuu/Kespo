@@ -1,8 +1,10 @@
 import Image from "next/image";
-import { bio, contact, influences, mainGenres, otherGenres, shows } from "./data";
+import MusicPlayer from "./MusicPlayer";
+import { bio, contact, influences, mainGenres, otherGenres, shows, tracks } from "./data";
 
 const nav = [
   { href: "#bio", label: "Bio" },
+  { href: "#musique", label: "Musique" },
   { href: "#style", label: "Style" },
   { href: "#shows", label: "Shows" },
   { href: "#contact", label: "Booking" },
@@ -35,14 +37,16 @@ export default function Home() {
 
       <main>
         <section id="top" className="hero">
-          <Image
-            src="/kespo-glass-club.jpg"
-            alt="Kespo aux platines au Glass Club, Cannes"
-            fill
-            priority
-            sizes="100vw"
-            className="hero-img"
-          />
+          <div className="hero-media">
+            <Image
+              src="/kespo-glass-club.jpg"
+              alt="Kespo aux platines au Glass Club, Cannes"
+              fill
+              priority
+              sizes="(min-width: 900px) 70vw, 100vw"
+              className="hero-img"
+            />
+          </div>
           <div className="hero-overlay" />
           <div className="hero-content">
             <p className="eyebrow">
@@ -56,8 +60,8 @@ export default function Home() {
               <a href="#contact" className="btn btn-primary">
                 Booking
               </a>
-              <a href={contact.soundcloud} target="_blank" rel="noopener noreferrer" className="btn">
-                Écouter sur SoundCloud
+              <a href="#musique" className="btn">
+                Écouter
               </a>
             </div>
           </div>
@@ -82,8 +86,16 @@ export default function Home() {
           </div>
         </section>
 
+        <section id="musique" className="section">
+          <SectionHeader title="Listen" index="02 — Musique" />
+          <MusicPlayer tracks={tracks} />
+          <a href={contact.soundcloud} target="_blank" rel="noopener noreferrer" className="more-link">
+            Tous les sets sur SoundCloud →
+          </a>
+        </section>
+
         <section id="style" className="section">
-          <SectionHeader title="Sound Identity" index="02 — Style" />
+          <SectionHeader title="Sound Identity" index="03 — Style" />
           <h3 className="label">Genres</h3>
           <ul className="tags">
             {mainGenres.map((g) => (
@@ -106,7 +118,7 @@ export default function Home() {
         </section>
 
         <section id="shows" className="section">
-          <SectionHeader title="Behind the Decks" index="03 — Shows" />
+          <SectionHeader title="Behind the Decks" index="04 — Shows" />
           <h3 className="label">Past &amp; Upcoming</h3>
           <ul className="list two-cols shows">
             {shows.map((s) => (
@@ -119,7 +131,7 @@ export default function Home() {
         </section>
 
         <section id="contact" className="section">
-          <SectionHeader title="Booking & Contact" index="04 — Contact" />
+          <SectionHeader title="Booking & Contact" index="05 — Contact" />
           <h3 className="label">Direct</h3>
           <ul className="list contact-list">
             <li>

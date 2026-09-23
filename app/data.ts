@@ -13,6 +13,46 @@ export const bio = [
   "La rencontre avec d’anciens membres du collectif St Germain est un moment clé qui l’oriente vers des sonorités house et jazz. Depuis, il a participé à des événements dans plusieurs endroits d’Europe tout en continuant à jouer à travers la France, apportant un mélange doux de beats profonds et mélodiques à ses sets.",
 ];
 
+export type Track = {
+  title: string;
+  place: string;
+  date: string;
+  /** Durée en secondes */
+  duration: number;
+  /** Lien public du morceau sur SoundCloud */
+  soundcloud: string;
+  /** Pochette carrée (SoundCloud : remplacer "-large" par "-t500x500" dans l'URL) */
+  artwork: string;
+};
+
+// Pour ajouter un son : le publier sur SoundCloud puis ajouter une entrée ici (le plus récent en premier).
+export const tracks: Track[] = [
+  {
+    title: "Sunny House",
+    place: "Annex Beach, Cannes",
+    date: "Février 2024",
+    duration: 2124,
+    soundcloud: "https://soundcloud.com/xkespo/label-france-contest",
+    artwork: "https://i1.sndcdn.com/artworks-WVO2HuBwGwcbUsck-YygplQ-t500x500.jpg",
+  },
+  {
+    title: "Live Set — House",
+    place: "Loop",
+    date: "Mai 2023",
+    duration: 3904,
+    soundcloud: "https://soundcloud.com/xkespo/house-mix-zodiak-brussels",
+    artwork: "https://i1.sndcdn.com/artworks-LmI9gAdDEq7GCEZ6-57jdKQ-t500x500.jpg",
+  },
+  {
+    title: "House Groove",
+    place: "Son des Guitares, Cannes",
+    date: "Avril 2023",
+    duration: 3317,
+    soundcloud: "https://soundcloud.com/xkespo/house-sdg",
+    artwork: "https://i1.sndcdn.com/artworks-tBBG47N2C6UWKL4E-W8nMeg-t500x500.jpg",
+  },
+];
+
 export const mainGenres = ["House", "Tech House", "Minimal"];
 export const otherGenres = ["Disco House", "House Jazz", "Acid", "Deep House", "Lounge"];
 
