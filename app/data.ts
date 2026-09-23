@@ -33,6 +33,14 @@ const blob = "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music";
 
 export const sets: Track[] = [
   {
+    title: "Tech House",
+    place: "Perlone, Nice",
+    date: "2025",
+    duration: 2430,
+    audio: `${blob}/kespo-tech-house-perlone.m4a`,
+    artwork: `${blob}/kespo-tech-house-perlone.jpg`,
+  },
+  {
     title: "Afro Tech",
     place: "Glass, Cannes",
     date: "2025",
