@@ -1,6 +1,6 @@
 import Image from "next/image";
 import MusicPlayer from "./MusicPlayer";
-import { bio, contact, influences, mainGenres, otherGenres, shows, tracks } from "./data";
+import { bio, contact, influences, mainGenres, otherGenres, productions, sets, shows } from "./data";
 
 const nav = [
   { href: "#bio", label: "Bio" },
@@ -88,7 +88,7 @@ export default function Home() {
 
         <section id="musique" className="section">
           <SectionHeader title="Listen" index="02 — Musique" />
-          <MusicPlayer tracks={tracks} />
+          <MusicPlayer sets={sets} productions={productions} />
           <a href={contact.soundcloud} target="_blank" rel="noopener noreferrer" className="more-link">
             Tous les sets sur SoundCloud →
           </a>

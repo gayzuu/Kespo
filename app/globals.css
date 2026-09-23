@@ -656,6 +656,53 @@ h2,
   }
 }
 
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 56px 0 0;
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.tab:hover {
+  border-color: var(--accent);
+}
+
+.tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg);
+}
+
+.tab-count {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.tracklist.with-tabs {
+  margin-top: 20px;
+}
+
 .tracklist {
   margin: 56px 0 0;
   padding: 0;

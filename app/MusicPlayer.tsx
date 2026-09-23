@@ -5,8 +5,9 @@ import Script from "next/script";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Track } from "./data";
 
-// Lecture via le widget officiel SoundCloud (iframe cachée pilotée par l'API Widget),
-// ce qui permet un design 100 % custom sans héberger les fichiers audio.
+// Deux sources de lecture derrière la même interface :
+// - sets SoundCloud : iframe cachée pilotée par l'API Widget officielle ;
+// - morceaux MP3 (Vercel Blob) : élément <audio> natif.
 type SCWidget = {
   bind(event: string, cb: (e: { currentPosition?: number }) => void): void;
   unbind(event: string): void;
@@ -22,6 +23,10 @@ declare global {
     SC?: { Widget: (el: HTMLIFrameElement) => SCWidget };
   }
 }
+
+type Tab = "sets" | "productions";
+
+const TAB_LABELS: Record<Tab, string> = { sets: "Sets", productions: "Morceaux" };
 
 const WIDGET_PARAMS = {
   hide_related: true,
@@ -47,6 +52,10 @@ function formatTime(totalSeconds: number) {
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
+function meta(t: Track) {
+  return [t.place, t.date].filter(Boolean).join(" · ");
+}
+
 // Onde stylisée, déterministe à partir du titre (identique côté serveur et client).
 function waveform(seed: string, bars: number) {
   let h = 2166136261;
@@ -64,58 +73,84 @@ function waveform(seed: string, bars: number) {
   });
 }
 
-export default function MusicPlayer({ tracks }: { tracks: Track[] }) {
+export default function MusicPlayer({ sets, productions }: { sets: Track[]; productions: Track[] }) {
+  const all = useMemo(() => [...sets, ...productions], [sets, productions]);
+  const tabs = (["sets", "productions"] as Tab[]).filter((t) => (t === "sets" ? sets : productions).length > 0);
+  const kindOf = useCallback((i: number): Tab => (i < sets.length ? "sets" : "productions"), [sets.length]);
+  const firstSC = all.findIndex((t) => t.soundcloud);
+
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const widgetRef = useRef<SCWidget | null>(null);
-  const loadedRef = useRef(0);
+  const loadedRef = useRef(firstSC === 0 ? 0 : -1);
   const playingRef = useRef(false);
   const currentRef = useRef(0);
   const fallbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
-  const [ready, setReady] = useState(false);
+  const [scReady, setScReady] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [tab, setTab] = useState<Tab>(tabs[0] ?? "sets");
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
   const [position, setPosition] = useState(0);
+  const [durations, setDurations] = useState<Record<number, number>>({});
   const [needsTap, setNeedsTap] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
   const [playerInView, setPlayerInView] = useState(true);
 
-  const track = tracks[current];
-  const bars = useMemo(() => waveform(track.title, 64), [track.title]);
-  const progress = Math.min(1, position / (track.duration * 1000));
+  const track = all[current];
+  const bars = useMemo(() => waveform(track?.title ?? "", 64), [track?.title]);
+  const durationOf = (i: number) => all[i]?.duration ?? durations[i] ?? 0;
+  const duration = durationOf(current);
+  const progress = duration ? Math.min(1, position / (duration * 1000)) : 0;
+  const canPlay = (i: number) => Boolean(all[i]?.audio) || scReady;
 
   const playRef = useRef<(i: number) => void>(() => {});
 
-  const bindEvents = useCallback((w: SCWidget) => {
-    for (const ev of ["play", "pause", "finish", "playProgress"]) w.unbind(ev);
-    w.bind("play", () => {
-      playingRef.current = true;
-      setPlaying(true);
-      setLoading(false);
-      setNeedsTap(false);
-      setHasPlayed(true);
-      if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
-    });
-    w.bind("pause", () => {
-      playingRef.current = false;
-      setPlaying(false);
-    });
-    w.bind("finish", () => {
-      playingRef.current = false;
-      setPlaying(false);
-      if (currentRef.current < tracks.length - 1) playRef.current(currentRef.current + 1);
-    });
-    w.bind("playProgress", (e) => setPosition(e.currentPosition ?? 0));
-  }, [tracks.length]);
+  const onStarted = useCallback(() => {
+    playingRef.current = true;
+    setPlaying(true);
+    setLoading(false);
+    setNeedsTap(false);
+    setHasPlayed(true);
+    if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+  }, []);
+
+  const onStopped = useCallback(() => {
+    playingRef.current = false;
+    setPlaying(false);
+  }, []);
+
+  // Enchaîne sur le suivant de la même liste (sets ou morceaux).
+  const onFinished = useCallback(() => {
+    onStopped();
+    const i = currentRef.current + 1;
+    if (i < all.length && kindOf(i) === kindOf(currentRef.current)) playRef.current(i);
+  }, [all.length, kindOf, onStopped]);
+
+  // Chaque source n'agit sur l'état que si c'est elle qui est chargée
+  // (évite qu'un "pause" SoundCloud tardif écrase la lecture d'un MP3, et inversement).
+  const scActive = useCallback(() => Boolean(all[loadedRef.current]?.soundcloud), [all]);
+  const audioActive = () => Boolean(all[loadedRef.current]?.audio);
+
+  const bindEvents = useCallback(
+    (w: SCWidget) => {
+      for (const ev of ["play", "pause", "finish", "playProgress"]) w.unbind(ev);
+      w.bind("play", () => scActive() && onStarted());
+      w.bind("pause", () => scActive() && onStopped());
+      w.bind("finish", () => scActive() && onFinished());
+      w.bind("playProgress", (e) => scActive() && setPosition(e.currentPosition ?? 0));
+    },
+    [scActive, onStarted, onStopped, onFinished],
+  );
 
   const initWidget = useCallback(() => {
     if (widgetRef.current || !iframeRef.current || !window.SC) return;
     const w = window.SC.Widget(iframeRef.current);
     widgetRef.current = w;
     w.bind("ready", () => {
-      setReady(true);
+      setScReady(true);
       bindEvents(w);
     });
   }, [bindEvents]);
@@ -132,35 +167,63 @@ export default function MusicPlayer({ tracks }: { tracks: Track[] }) {
   };
 
   const play = (i: number) => {
+    const t = all[i];
     const w = widgetRef.current;
-    if (!w) return;
+    const audio = audioRef.current;
+    if (!t || !audio || (t.soundcloud && !w)) return;
+
     if (i === loadedRef.current) {
-      if (!playingRef.current) armFallback();
-      w.toggle();
+      if (t.audio) {
+        if (audio.paused) audio.play().catch(onStopped);
+        else audio.pause();
+      } else {
+        if (!playingRef.current) armFallback();
+        w!.toggle();
+      }
       return;
     }
+
+    const prev = all[loadedRef.current];
+    if (prev?.audio) audio.pause();
+    if (prev?.soundcloud) w?.pause();
+    if (fallbackTimer.current) clearTimeout(fallbackTimer.current);
+    setNeedsTap(false);
+
     loadedRef.current = i;
     currentRef.current = i;
     setCurrent(i);
+    setTab(kindOf(i));
     setPosition(0);
     setLoading(true);
-    w.load(tracks[i].soundcloud, {
-      ...WIDGET_PARAMS,
-      auto_play: true,
-      callback: () => {
-        bindEvents(w);
-        w.play();
-      },
-    });
-    armFallback();
+
+    if (t.audio) {
+      audio.src = t.audio;
+      audio.play().catch(() => {
+        onStopped();
+        setLoading(false);
+      });
+    } else if (t.soundcloud) {
+      w!.load(t.soundcloud, {
+        ...WIDGET_PARAMS,
+        auto_play: true,
+        callback: () => {
+          bindEvents(w!);
+          w!.play();
+        },
+      });
+      armFallback();
+    }
   };
   playRef.current = play;
 
   const seek = (fraction: number) => {
-    const ms = Math.max(0, Math.min(1, fraction)) * track.duration * 1000;
+    if (!duration || loadedRef.current !== current) return;
+    const ms = Math.max(0, Math.min(1, fraction)) * duration * 1000;
     setPosition(ms);
-    widgetRef.current?.seekTo(ms);
+    if (track.audio && audioRef.current) audioRef.current.currentTime = ms / 1000;
+    else widgetRef.current?.seekTo(ms);
   };
+
 
   useEffect(() => {
     initWidget();
@@ -179,150 +242,188 @@ export default function MusicPlayer({ tracks }: { tracks: Track[] }) {
     return () => obs.disconnect();
   }, []);
 
-  const prev = () => play((current - 1 + tracks.length) % tracks.length);
-  const next = () => play((current + 1) % tracks.length);
+  // Précédent / suivant restent dans la liste du morceau en cours.
+  const step = (dir: 1 | -1) => {
+    const kind = kindOf(current);
+    const start = kind === "sets" ? 0 : sets.length;
+    const size = kind === "sets" ? sets.length : productions.length;
+    play(start + ((current - start + dir + size) % size));
+  };
+
+  const visible = all.map((t, i) => ({ t, i })).filter(({ i }) => kindOf(i) === tab);
 
   return (
     <>
-      <Script src="https://w.soundcloud.com/player/api.js" strategy="afterInteractive" onReady={initWidget} />
+      {firstSC >= 0 && (
+        <Script src="https://w.soundcloud.com/player/api.js" strategy="afterInteractive" onReady={initWidget} />
+      )}
+      <audio
+        ref={audioRef}
+        preload="none"
+        onPlaying={() => audioActive() && onStarted()}
+        onPause={() => audioActive() && onStopped()}
+        onEnded={() => audioActive() && onFinished()}
+        onWaiting={() => audioActive() && setLoading(true)}
+        onTimeUpdate={(e) => audioActive() && setPosition(e.currentTarget.currentTime * 1000)}
+        onLoadedMetadata={(e) => {
+          const d = e.currentTarget.duration;
+          if (Number.isFinite(d)) setDurations((prev) => ({ ...prev, [loadedRef.current]: d }));
+        }}
+      />
 
-      <div ref={playerRef} className={`player ${playing ? "is-playing" : ""}`}>
-        <div className="deck">
-          <div className="vinyl" aria-hidden>
-            <div className="vinyl-label" style={{ backgroundImage: `url(${track.artwork})` }} />
+      {track && (
+        <>
+          <div ref={playerRef} className={`player ${playing ? "is-playing" : ""}`}>
+            <div className="deck">
+              <div className="vinyl" aria-hidden>
+                <div className="vinyl-label" style={{ backgroundImage: `url(${track.artwork})` }} />
+              </div>
+              <div className="cover">
+                <Image src={track.artwork} alt={`Pochette — ${track.title}`} fill sizes="(max-width: 640px) 70vw, 340px" />
+              </div>
+            </div>
+
+            <div className="player-main">
+              <p className="now">
+                <Equalizer active={playing} />
+                {playing ? "En lecture" : "À l’écoute"}
+                <span className="now-count">{TAB_LABELS[kindOf(current)]}</span>
+              </p>
+              <h3 className="track-title">{track.title}</h3>
+              <p className="track-meta">{meta(track)}</p>
+
+              <div className="controls">
+                <button type="button" className="ctrl" onClick={() => step(-1)} aria-label="Précédent" disabled={!canPlay(current)}>
+                  <PrevIcon />
+                </button>
+                <button
+                  type="button"
+                  className={`ctrl ctrl-main ${loading ? "is-loading" : ""}`}
+                  onClick={() => play(current)}
+                  aria-label={playing ? "Pause" : "Lecture"}
+                  disabled={!canPlay(current)}
+                >
+                  {playing ? <PauseIcon /> : <PlayIcon />}
+                </button>
+                <button type="button" className="ctrl" onClick={() => step(1)} aria-label="Suivant" disabled={!canPlay(current)}>
+                  <NextIcon />
+                </button>
+              </div>
+
+              <div
+                className="wave"
+                role="slider"
+                tabIndex={0}
+                aria-label="Position dans le morceau"
+                aria-valuemin={0}
+                aria-valuemax={Math.floor(duration)}
+                aria-valuenow={Math.floor(position / 1000)}
+                aria-valuetext={formatTime(position / 1000)}
+                onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect();
+                  seek((e.clientX - r.left) / r.width);
+                }}
+                onKeyDown={(e) => {
+                  if (!duration) return;
+                  const delta = 10 / duration;
+                  if (e.key === "ArrowRight") seek(progress + delta);
+                  if (e.key === "ArrowLeft") seek(progress - delta);
+                }}
+              >
+                {bars.map((v, i) => (
+                  <span key={i} className={i / bars.length < progress ? "played" : ""} style={{ height: `${v * 100}%` }} />
+                ))}
+              </div>
+              <div className="times">
+                <span>{formatTime(position / 1000)}</span>
+                <span>{duration ? formatTime(duration) : "--:--"}</span>
+              </div>
+
+              {firstSC >= 0 && (
+                <div className={`sc-embed ${needsTap ? "visible" : ""}`}>
+                  {needsTap && <p>Ton navigateur bloque la lecture automatique : lance le son depuis le lecteur ci-dessous.</p>}
+                  <iframe
+                    ref={iframeRef}
+                    src={widgetSrc(all[firstSC].soundcloud!)}
+                    title="Lecteur SoundCloud"
+                    allow="autoplay"
+                  />
+                </div>
+              )}
+            </div>
           </div>
-          <div className="cover">
-            <Image src={track.artwork} alt={`Pochette — ${track.title}`} fill sizes="(max-width: 640px) 70vw, 340px" />
-          </div>
-        </div>
 
-        <div className="player-main">
-          <p className="now">
-            <Equalizer active={playing} />
-            {playing ? "En lecture" : "À l’écoute"}
-            <span className="now-count">
-              {String(current + 1).padStart(2, "0")} / {String(tracks.length).padStart(2, "0")}
-            </span>
-          </p>
-          <h3 className="track-title">{track.title}</h3>
-          <p className="track-meta">
-            {track.place} · {track.date}
-          </p>
+          {tabs.length > 1 && (
+            <div className="tabs" role="tablist" aria-label="Type de sons">
+              {tabs.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === t}
+                  className={`tab ${tab === t ? "active" : ""}`}
+                  onClick={() => setTab(t)}
+                >
+                  {TAB_LABELS[t]}
+                  <span className="tab-count">{(t === "sets" ? sets : productions).length}</span>
+                </button>
+              ))}
+            </div>
+          )}
 
-          <div className="controls">
-            <button type="button" className="ctrl" onClick={prev} aria-label="Morceau précédent" disabled={!ready}>
+          <ol className={`tracklist ${tabs.length > 1 ? "with-tabs" : ""}`}>
+            {visible.map(({ t, i }, n) => {
+              const active = i === current;
+              const d = durationOf(i);
+              return (
+                <li key={t.soundcloud ?? t.audio}>
+                  <button
+                    type="button"
+                    className={`track-row ${active ? "active" : ""}`}
+                    onClick={() => play(i)}
+                    disabled={!canPlay(i)}
+                    aria-label={`${active && playing ? "Pause" : "Écouter"} ${t.title}`}
+                  >
+                    <span className="track-num">
+                      {active && playing ? <Equalizer active /> : String(n + 1).padStart(2, "0")}
+                    </span>
+                    <span className="track-thumb">
+                      <Image src={t.artwork} alt="" fill sizes="56px" />
+                      <span className="track-thumb-icon">{active && playing ? <PauseIcon /> : <PlayIcon />}</span>
+                    </span>
+                    <span className="track-info">
+                      <span className="track-row-title">{t.title}</span>
+                      <span className="track-row-meta">{meta(t)}</span>
+                    </span>
+                    <span className="track-duration">{d ? formatTime(d) : ""}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
+          <div className={`mini-bar ${hasPlayed && !playerInView ? "show" : ""}`} aria-hidden={!hasPlayed || playerInView}>
+            <div className="mini-progress" style={{ transform: `scaleX(${progress})` }} />
+            <div className="mini-thumb">
+              <Image src={track.artwork} alt="" fill sizes="44px" />
+            </div>
+            <a href="#musique" className="mini-info">
+              <span className="track-row-title">{track.title}</span>
+              <span className="track-row-meta">{track.place ?? track.date}</span>
+            </a>
+            <button type="button" className="ctrl" onClick={() => step(-1)} aria-label="Précédent">
               <PrevIcon />
             </button>
-            <button
-              type="button"
-              className={`ctrl ctrl-main ${loading ? "is-loading" : ""}`}
-              onClick={() => play(current)}
-              aria-label={playing ? "Pause" : "Lecture"}
-              disabled={!ready}
-            >
+            <button type="button" className="ctrl ctrl-main" onClick={() => play(current)} aria-label={playing ? "Pause" : "Lecture"}>
               {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
-            <button type="button" className="ctrl" onClick={next} aria-label="Morceau suivant" disabled={!ready}>
+            <button type="button" className="ctrl" onClick={() => step(1)} aria-label="Suivant">
               <NextIcon />
             </button>
           </div>
+        </>
+      )}
 
-          <div
-            className="wave"
-            role="slider"
-            tabIndex={0}
-            aria-label="Position dans le morceau"
-            aria-valuemin={0}
-            aria-valuemax={track.duration}
-            aria-valuenow={Math.floor(position / 1000)}
-            aria-valuetext={formatTime(position / 1000)}
-            onClick={(e) => {
-              const r = e.currentTarget.getBoundingClientRect();
-              seek((e.clientX - r.left) / r.width);
-            }}
-            onKeyDown={(e) => {
-              const step = 10 / track.duration;
-              if (e.key === "ArrowRight") seek(progress + step);
-              if (e.key === "ArrowLeft") seek(progress - step);
-            }}
-          >
-            {bars.map((v, i) => (
-              <span
-                key={i}
-                className={i / bars.length < progress ? "played" : ""}
-                style={{ height: `${v * 100}%` }}
-              />
-            ))}
-          </div>
-          <div className="times">
-            <span>{formatTime(position / 1000)}</span>
-            <span>{formatTime(track.duration)}</span>
-          </div>
-
-          <div className={`sc-embed ${needsTap ? "visible" : ""}`}>
-            {needsTap && <p>Ton navigateur bloque la lecture automatique : lance le son depuis le lecteur ci-dessous.</p>}
-            <iframe
-              ref={iframeRef}
-              src={widgetSrc(tracks[0].soundcloud)}
-              title="Lecteur SoundCloud"
-              allow="autoplay"
-              loading="eager"
-            />
-          </div>
-        </div>
-      </div>
-
-      <ol className="tracklist">
-        {tracks.map((t, i) => {
-          const active = i === current;
-          return (
-            <li key={t.soundcloud}>
-              <button
-                type="button"
-                className={`track-row ${active ? "active" : ""}`}
-                onClick={() => play(i)}
-                disabled={!ready}
-                aria-label={`${active && playing ? "Pause" : "Écouter"} ${t.title}`}
-              >
-                <span className="track-num">
-                  {active && playing ? <Equalizer active /> : String(i + 1).padStart(2, "0")}
-                </span>
-                <span className="track-thumb">
-                  <Image src={t.artwork} alt="" fill sizes="56px" />
-                  <span className="track-thumb-icon">{active && playing ? <PauseIcon /> : <PlayIcon />}</span>
-                </span>
-                <span className="track-info">
-                  <span className="track-row-title">{t.title}</span>
-                  <span className="track-row-meta">
-                    {t.place} · {t.date}
-                  </span>
-                </span>
-                <span className="track-duration">{formatTime(t.duration)}</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-
-      <div className={`mini-bar ${hasPlayed && !playerInView ? "show" : ""}`} aria-hidden={!hasPlayed || playerInView}>
-        <div className="mini-progress" style={{ transform: `scaleX(${progress})` }} />
-        <div className="mini-thumb">
-          <Image src={track.artwork} alt="" fill sizes="44px" />
-        </div>
-        <a href="#musique" className="mini-info">
-          <span className="track-row-title">{track.title}</span>
-          <span className="track-row-meta">{track.place}</span>
-        </a>
-        <button type="button" className="ctrl" onClick={prev} aria-label="Morceau précédent">
-          <PrevIcon />
-        </button>
-        <button type="button" className="ctrl ctrl-main" onClick={() => play(current)} aria-label={playing ? "Pause" : "Lecture"}>
-          {playing ? <PauseIcon /> : <PlayIcon />}
-        </button>
-        <button type="button" className="ctrl" onClick={next} aria-label="Morceau suivant">
-          <NextIcon />
-        </button>
-      </div>
     </>
   );
 }

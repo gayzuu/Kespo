@@ -15,18 +15,21 @@ export const bio = [
 
 export type Track = {
   title: string;
-  place: string;
+  /** Lieu du set, ou sous-titre (ex. "Original Mix") pour un morceau */
+  place?: string;
   date: string;
-  /** Durée en secondes */
-  duration: number;
-  /** Lien public du morceau sur SoundCloud */
-  soundcloud: string;
-  /** Pochette carrée (SoundCloud : remplacer "-large" par "-t500x500" dans l'URL) */
+  /** Durée en secondes (optionnelle pour un MP3 : lue automatiquement) */
+  duration?: number;
+  /** Pochette carrée */
   artwork: string;
-};
+} & (
+  | { /** Lien public SoundCloud */ soundcloud: string; audio?: never }
+  | { /** URL du fichier audio (Vercel Blob) */ audio: string; soundcloud?: never }
+);
 
-// Pour ajouter un son : le publier sur SoundCloud puis ajouter une entrée ici (le plus récent en premier).
-export const tracks: Track[] = [
+// Sets : hébergés sur SoundCloud (le plus récent en premier).
+// Pochette SoundCloud : remplacer "-large" par "-t500x500" dans l'URL.
+export const sets: Track[] = [
   {
     title: "Sunny House",
     place: "Annex Beach, Cannes",
@@ -52,6 +55,17 @@ export const tracks: Track[] = [
     artwork: "https://i1.sndcdn.com/artworks-tBBG47N2C6UWKL4E-W8nMeg-t500x500.jpg",
   },
 ];
+
+// Morceaux : fichiers MP3 hébergés sur Vercel Blob (`npm run upload -- fichier.mp3` donne l'URL).
+// Exemple :
+// {
+//   title: "Nom du morceau",
+//   place: "Original Mix",
+//   date: "2026",
+//   audio: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.mp3",
+//   artwork: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.jpg",
+// },
+export const productions: Track[] = [];
 
 export const mainGenres = ["House", "Tech House", "Minimal"];
 export const otherGenres = ["Disco House", "House Jazz", "Acid", "Deep House", "Lounge"];
