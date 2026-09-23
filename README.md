@@ -22,11 +22,15 @@ Importer le repo sur Vercel : le framework Next.js est détecté automatiquement
 
 ## Ajouter un son
 
-Deux sources, un seul player (onglets « Sets » et « Morceaux » dans la section Musique).
+Trois sources, un seul player (onglets « Sets » et « Morceaux » dans la section Musique).
 
 **Sets → SoundCloud**
 1. Publier le set sur SoundCloud (en public).
 2. Ajouter une entrée en haut de `sets` dans `app/data.ts` (titre, lieu, date, durée en secondes, lien SoundCloud, pochette).
+
+**Sets → YouTube**
+Ajouter une entrée dans `sets` avec `youtube: "IDENTIFIANT"` (la fin du lien youtu.be/IDENTIFIANT) et une pochette.
+Pendant la lecture, la vidéo remplace la pochette (règle YouTube : le lecteur doit rester visible).
 
 **Morceaux → Vercel Blob**
 1. Une seule fois : sur Vercel, onglet Storage du projet → Create → Blob, puis le relier au projet.

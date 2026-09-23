@@ -23,13 +23,33 @@ export type Track = {
   /** Pochette carrée */
   artwork: string;
 } & (
-  | { /** Lien public SoundCloud */ soundcloud: string; audio?: never }
-  | { /** URL du fichier audio (Vercel Blob) */ audio: string; soundcloud?: never }
+  | { /** Lien public SoundCloud */ soundcloud: string; audio?: never; youtube?: never }
+  | { /** URL du fichier audio (Vercel Blob) */ audio: string; soundcloud?: never; youtube?: never }
+  | { /** Identifiant de la vidéo YouTube (youtu.be/IDENTIFIANT) */ youtube: string; soundcloud?: never; audio?: never }
 );
 
-// Sets : hébergés sur SoundCloud (le plus récent en premier).
+// Sets : hébergés sur SoundCloud ou YouTube (le plus récent en premier).
 // Pochette SoundCloud : remplacer "-large" par "-t500x500" dans l'URL.
+// Pour YouTube, la vidéo remplace la pochette pendant la lecture (obligatoire chez YouTube).
+const blob = "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music";
+
 export const sets: Track[] = [
+  {
+    title: "Tech House",
+    place: "Glass, Cannes",
+    date: "Février 2026",
+    duration: 3668,
+    youtube: "Oq6vAi0Cpbg",
+    artwork: `${blob}/gon6.jpg`,
+  },
+  {
+    title: "Summer Vibes",
+    place: "Mix contest",
+    date: "Juin 2025",
+    duration: 1724,
+    youtube: "tFL757t-o4Y",
+    artwork: `${blob}/kespo-summer-vibes.jpg`,
+  },
   {
     title: "Sunny House",
     place: "Annex Beach, Cannes",
@@ -37,6 +57,14 @@ export const sets: Track[] = [
     duration: 2124,
     soundcloud: "https://soundcloud.com/xkespo/label-france-contest",
     artwork: "https://i1.sndcdn.com/artworks-WVO2HuBwGwcbUsck-YygplQ-t500x500.jpg",
+  },
+  {
+    title: "Lounge Jazz",
+    place: "Yachting Festival, Cannes",
+    date: "Octobre 2023",
+    duration: 3794,
+    youtube: "eWT5uEUs-38",
+    artwork: `${blob}/kespo-lounge-jazz.jpg`,
   },
   {
     title: "Live Set — House",
@@ -65,14 +93,12 @@ export const sets: Track[] = [
 //   audio: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.mp3",
 //   artwork: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.jpg",
 // },
-// Pochette déjà en ligne pour le prochain morceau :
-// https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/gon6.jpg
 export const productions: Track[] = [
   {
     title: "AcidZoo",
     date: "2026",
-    audio: "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/kespo-acidzoo.m4a",
-    artwork: "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/kespo-acidzoo.jpg",
+    audio: `${blob}/kespo-acidzoo.m4a`,
+    artwork: `${blob}/kespo-acidzoo.jpg`,
   },
 ];
 
