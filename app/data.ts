@@ -65,7 +65,16 @@ export const sets: Track[] = [
 //   audio: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.mp3",
 //   artwork: "https://xxxx.public.blob.vercel-storage.com/music/nom-du-morceau.jpg",
 // },
-export const productions: Track[] = [];
+// Pochette déjà en ligne pour le prochain morceau :
+// https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/gon6.jpg
+export const productions: Track[] = [
+  {
+    title: "AcidZoo",
+    date: "2026",
+    audio: "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/kespo-acidzoo.m4a",
+    artwork: "https://jubhmivctmup1alc.public.blob.vercel-storage.com/music/kespo-acidzoo.jpg",
+  },
+];
 
 export const mainGenres = ["House", "Tech House", "Minimal"];
 export const otherGenres = ["Disco House", "House Jazz", "Acid", "Deep House", "Lounge"];

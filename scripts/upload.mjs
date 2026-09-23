@@ -15,6 +15,17 @@ if (!process.env.BLOB_READ_WRITE_TOKEN) {
   process.exit(1);
 }
 
+const TYPES = {
+  ".mp3": "audio/mpeg",
+  ".m4a": "audio/mp4",
+  ".aac": "audio/aac",
+  ".wav": "audio/wav",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+};
+
 const slug = (name) =>
   name
     .normalize("NFD")
@@ -26,6 +37,11 @@ const slug = (name) =>
 for (const file of files) {
   const ext = extname(file);
   const name = `music/${slug(basename(file, ext))}${ext.toLowerCase()}`;
-  const blob = await put(name, await readFile(file), { access: "public", addRandomSuffix: false, allowOverwrite: true });
+  const blob = await put(name, await readFile(file), {
+    access: "public",
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: TYPES[ext.toLowerCase()],
+  });
   console.log(`${basename(file)} → ${blob.url}`);
 }
